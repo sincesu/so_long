@@ -19,10 +19,6 @@ typedef struct s_graphics {
     void    *collectible_img;
     void    *empty_img;
     void    *exit_img;
-    void    *player_up_img;
-    void    *player_down_img;
-    void    *player_left_img;
-    void    *player_right_img;
 }   t_graphics;
 
 typedef struct s_map

@@ -8,49 +8,111 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-void	safe_exit(t_game *game, char *msg)
-{
-	if(game)
-	{
-	if(game->graphics)
-	{
-		free(game->graphics);
-		mlx_free(game->graphics);
-	}
-	if(game->map)
-		free(game->map);
-	free(game);
-	}
-	ft_putendl_fd("Error", 1);
-	ft_putendl_fd(msg, 1);
-	exit(1);
-}
-
 void	mlx_free(t_graphics *graphics)
 {
-	if(graphics->mlx_win)
-		mlx_destroy_window(graphics->mlx, graphics->mlx_win);
 	if(graphics->collectible_img)
+	{
+		printf("Freeing collectible image\n");
 		mlx_destroy_image(graphics->mlx, graphics->collectible_img);
+	}
 	if(graphics->empty_img)
+	{
+		printf("Freeing empty image\n");
 		mlx_destroy_image(graphics->mlx, graphics->empty_img);
+	}
 	if(graphics->exit_img)
+	{
+		printf("Freeing exit image\n");
 		mlx_destroy_image(graphics->mlx, graphics->exit_img);
+	}
 	if(graphics->player_img)
+	{
+		printf("Freeing player image\n");
 		mlx_destroy_image(graphics->mlx, graphics->player_img);
+	}
 	if(graphics->wall_img)
+	{
+		printf("Freeing wall image\n");
 		mlx_destroy_image(graphics->mlx, graphics->wall_img);
-	if(graphics->player_up_img)
-		mlx_destroy_image(graphics->mlx, graphics->player_up_img);
-	if(graphics->player_down_img)
-		mlx_destroy_image(graphics->mlx, graphics->player_down_img);
-	if(graphics->player_left_img)
-		mlx_destroy_image(graphics->mlx, graphics->player_left_img);
-	if(graphics->player_right_img)
-		mlx_destroy_image(graphics->mlx, graphics->player_right_img);
+	}
+	if(graphics->mlx_win)
+	{
+		printf("Destroying mlx window\n");
+		mlx_destroy_window(graphics->mlx, graphics->mlx_win);
+	}
 	if(graphics->mlx)
+	{
+		printf("Destroying MLX display\n");
 		mlx_destroy_display(graphics->mlx);
+		free(graphics->mlx);
+		printf("MLX freed\n");
+	}
+
+	printf("MLX free completed\n");
 }
+
+void	free_map(t_map *map)
+{
+	int i;
+
+	i = 0;
+	if (map->map_test)
+	{
+		while(map->map_test[i])
+		{
+			free(map->map_test[i]);
+			i++;
+		}
+		free(map->map_test);
+	}
+	free(map);
+}
+
+void safe_exit(t_game *game, char *msg)
+{
+    printf("Safe exit started\n");
+    
+    if(game)
+    {
+        if(game->graphics)
+        {
+            printf("Freeing graphics\n");
+            mlx_free(game->graphics);
+            printf("Graphics MLX freed\n");
+            free(game->graphics);
+            printf("Graphics structure freed\n");
+        }
+        
+        if(game->map)
+        {
+            printf("Freeing map\n");
+            free_map(game->map);
+            printf("Map freed\n");
+        }
+        
+        printf("Freeing game structure\n");
+        free(game);
+        printf("Game freed\n");
+    }
+    
+    ft_putendl_fd(msg, 1);
+    printf("Exiting program\n");
+    exit(0);
+}
+
+void	free_visited(int **visited, int lines)
+{
+	int i;
+
+	i = 0;
+	while(i < lines)
+	{
+		free(visited[i]);
+		i++;
+	}
+	free(visited);
+}
+
 
 int dfs(char **str, int x, int y, int **visited, int *found_collectible, int *found_exit)
 {
@@ -89,7 +151,10 @@ int **init_visited(t_game *game)
     {
         visited[i] = malloc(game->map->cols * sizeof(int));
 		if(!visited[i])
+		{
+			free_visited(visited, i);
 			safe_exit(game, "Allocation error");
+		}
         j = 0;
         while (j < game->map->cols)
         {
@@ -116,13 +181,11 @@ void check_valid_path(t_game *game)
     dfs(game->map->map_test, game->map->player_line, game->map->player_col, 
 		visited, &found_collectible, &found_exit);
     if (!found_collectible || !found_exit)
+	{
+		free_visited(visited, game->map->line);
         safe_exit(game, "unreachable map");
-    while (i < game->map->line)
-    {
-        free(visited[i]);
-        i++;
-    }
-    free(visited);
+	}
+	free_visited(visited, game->map->line);
 }
 
 int ft_compare(char *s1, char *s2)
@@ -146,7 +209,7 @@ void check_is_rect(t_game *game)
 	while(game->map->map_test[l])
 	{
 		if(ft_strlen(game->map->map_test[l]) != game->map->cols)
-			safe_exit(game->map, "Map is not rect");
+			safe_exit(game, "Map is not rect");
 		l++;
 	}
 }
@@ -203,7 +266,7 @@ void map_wall_controller(t_game *game, char **str)
 	while(str[l])
 	{
 		i = 0;
-		while(str[l][i])
+		while(str[l][i]) //6- 14
 		{
 			if (str[0][i] != '1' || str[l][0] != '1'
 				|| str[l][game->map->cols - 1] != '1')
@@ -217,7 +280,8 @@ void map_wall_controller(t_game *game, char **str)
 					i++;
 				}
 			}
-			i++;
+			else
+				i++;
 		}
 		l++;
 	}
@@ -231,25 +295,35 @@ void	map_loader(char *filename, t_game *game)
 	int fd;
 
 	k = 0;
-	fd = open(filename, 02);
+	fd = open(filename, O_RDONLY);
 	if (fd <= -1)
-		safe_exit(game->map, "File descriptor error");
-	while(get_next_line(fd) != NULL)
+		safe_exit(game, "File descriptor error");
+	while((tmp = get_next_line(fd)) != NULL)
+	{
 		game->map->line++;
+		free(tmp);
+	}
 	close(fd);
+	//if (game->map->line == 0)
+	//	safe_exit(game, "Map file is empty");
 	game->map->map_test = malloc((game->map->line + 1) * sizeof(char *));
-	fd = open(filename, 02);
+	if(!game->map->map_test)
+		safe_exit(game, "Allocation error");
+	fd = open(filename, O_RDONLY);
 	if (fd <= -1)
 		safe_exit(game, "File descriptor error");
 	while((tmp = get_next_line(fd)) != NULL)
 	{
 		game->map->cols = ft_strlen(tmp);
 		game->map->map_test[k] = malloc(game->map->cols + 1);
+		if(!game->map->map_test[k])
+			safe_exit(game, "Allocation error");
 		ft_memcpy(game->map->map_test[k], tmp, game->map->cols);
 		game->map->map_test[k][game->map->cols] = '\0';
 		k++;
 		free(tmp);
 	}
+	close(fd);
 	game->map->map_test[k] = NULL;
 	printf("Satır Sayısı: [%d]\n", game->map->line);
 	printf("Sütun Sayısı: [%d]\n", game->map->cols);
@@ -262,8 +336,8 @@ t_game	*init_game(void)
 	game = malloc(sizeof(t_game));
 	if(!game)
 		safe_exit(NULL, "Allocation error");
-	game->graphics=NULL;
 	game->map=NULL;
+	game->graphics=NULL;
 	game->move_count=1;
 	return(game);
 }
@@ -275,14 +349,26 @@ t_map	*init_map(void)
 	map = malloc(sizeof(t_map));
 	if(!map)
 		safe_exit(NULL, "Allocation error");
-	map->collectible=0;
-	map->exit=0;
-	map->start=0;
-	map->wall=0;
-	map->line=0;
-	map->cols=0;
-	map->player_col=0;
-	map->player_line=0;
+	ft_memset(map, 0, sizeof(t_map));
+	// map->map_test=NULL;
+	// printf("[%d]\n", map->collectible);
+	// printf("[%d]\n", map->exit);
+	// printf("[%d]\n", map->start);
+	// printf("[%d]\n", map->wall);
+	// printf("[%d]\n", map->line);
+	// printf("[%d]\n", map->cols);
+	// printf("[%d]\n", map->player_col);
+	// printf("[%d]\n", map->player_line);
+	// printf("[%s]\n", map->map_test);
+
+	// map->collectible=0;
+	// map->exit=0;
+	// map->start=0;
+	// map->wall=0;
+	// map->line=0;
+	// map->cols=0;
+	// map->player_col=0;
+	// map->player_line=0;
 	return (map);
 }
 
@@ -293,17 +379,17 @@ t_graphics *init_graphics(void)
 	graphics = malloc(sizeof(t_graphics));
 	if (!graphics)
 		safe_exit(NULL, "Allocation error");
-	graphics->mlx = NULL;
-	graphics->mlx_win = NULL;
-	graphics->wall_img = NULL;
-	graphics->player_img = NULL;
-	graphics->collectible_img = NULL;
-	graphics->empty_img = NULL;
-	graphics->exit_img = NULL;
-	graphics->player_up_img = NULL;
-	graphics->player_down_img = NULL;
-	graphics->player_left_img = NULL;
-	graphics->player_right_img = NULL;
+	
+	printf("Initializing graphics pointers...\n");
+	ft_memset(graphics, 0, sizeof(graphics));
+	// graphics->mlx = NULL;
+	// graphics->mlx_win = NULL;
+	// graphics->wall_img = NULL;
+	// graphics->player_img = NULL;
+	// graphics->collectible_img = NULL;
+	// graphics->empty_img = NULL;
+	// graphics->exit_img = NULL;
+	printf("All graphics pointers initialized to NULL\n");
 	return (graphics);
 }
 
@@ -332,15 +418,16 @@ void	*load_image(t_game *game, char *path)
 
 void	create_images(t_game *game)
 {
-	game->graphics->wall_img = load_image(game, "./images/wall.xpm");
-	game->graphics->player_img = load_image(game, "./images/player.xpm");
-	game->graphics->collectible_img = load_image(game, "./images/collectible.xpm");
-	game->graphics->empty_img = load_image(game, "./images/empty.xpm");
-	game->graphics->exit_img = load_image(game, "./images/exit.xpm");
-	game->graphics->player_up_img = load_image(game, "./images/player_up.xpm");
-	game->graphics->player_down_img = load_image(game, "./images/player_down.xpm");
-	game->graphics->player_left_img = load_image(game, "./images/player_left.xpm");
-	game->graphics->player_right_img = load_image(game, "./images/player_right.xpm");
+	game->graphics->wall_img = load_image(game, "./textures/wall.xpm");
+	printf("wall image loaded\n");
+	game->graphics->player_img = load_image(game, "./textures/player.xpm");
+	printf("player image loaded\n");
+	game->graphics->collectible_img = load_image(game, "./textures/collectible.xpm");
+	printf("collectible image loaded\n");
+	game->graphics->empty_img = load_image(game, "./textures/empty.xpm");
+	printf("empty image loaded\n");
+	game->graphics->exit_img = load_image(game, "./textures/exit.xpm");
+	printf("exit image loaded\n");
 }
 
 void create_window(t_game *game)
@@ -369,26 +456,26 @@ void *get_image_by_tile(t_game *game, int tile)
     if (!img)
 		safe_exit(game, "image could not be suppressed");
 
-    return img;
+    return (img);
 }
 
 
 void	render_map(t_game *game)
 {
-	int	line;
 	int	col;
+	int	line;
 	void	*img;
 
-	line = 0;
-	while(game->map->map_test[line])
+	col = 0;
+	while(game->map->map_test[col])
 	{
-		col = 0;
-		while(game->map->map_test[line][col])
+		line = 0;
+		while(game->map->map_test[col][line])
 		{
-			img = get_image_by_tile(game, game->map->map_test[line][col]);
+			img = get_image_by_tile(game, game->map->map_test[col][line]);
 			mlx_put_image_to_window(game->graphics->mlx,
 			game->graphics->mlx_win, img , line * 64, col * 64);
-			col++;
+			line++;
 		}
 		col++;
 	}
@@ -421,26 +508,6 @@ int	mov_player_if_valid(t_game *game, int new_line, int new_col)
 	return (1);
 }
 
-int process_key_landr(int keycode, t_game *game)
-{
-	int	new_col;
-
-	new_col = game->map->player_col;
-
-	if (keycode == LEFT)
-	{
-		game->graphics->player_img = game->graphics->player_left_img;
-		new_col--;
-	}
-	else if (keycode == RIGHT)
-	{
-		game->graphics->player_img = game->graphics->player_right_img;
-		new_col++;
-	}
-
-	return(new_col);
-}
-
 int	process_key(int keycode, t_game *game)
 {
 	int	new_line;
@@ -449,19 +516,13 @@ int	process_key(int keycode, t_game *game)
 	new_line = game->map->player_line;
 	new_col = game->map->player_col;
 	if (keycode == UP)
-	{
-		game->graphics->player_img = game->graphics->player_up_img;
 		new_line--;
-	}
 	else if (keycode == DOWN)
-	{
-		game->graphics->player_img = game->graphics->player_down_img;
 		new_line++;
-	}
 	else if (keycode == LEFT)
-		new_col = process_key_landr(keycode, game);
+		new_col--;
 	else if (keycode == RIGHT)
-		new_col = process_key_landr(keycode, game);
+		new_col++;
 	else
 		return (0);
 	return (mov_player_if_valid(game, new_line, new_col));
@@ -482,8 +543,7 @@ int is_collectible(t_game *game)
 int	key_input_handler(int keycode, t_game *game)
 {
 	if (keycode == ESC)
-		exit(1);
-	//burda kaldım
+		safe_exit(game, "Program finished");
 	if(!process_key(keycode, game))
 		return (0);
 	if (is_collectible(game))
@@ -494,15 +554,18 @@ int	key_input_handler(int keycode, t_game *game)
 	print_move_count(game->move_count++);
 	if (game->map->map_test[game->map->player_line][game->map->player_col] == 'E'
 		&& game->map->collectible == 0)
-		exit(1);
+		{
+		printf("Exit reached! Collectibles: %d\n", game->map->collectible);
+		safe_exit(game, "Program finished");
+		}
 	render_map(game);
 	render_player(game);
-	return 0;
+	return (0);
 }
 
-int close_window()
+int close_window(t_game *game)
 {
-	exit(1);
+	safe_exit(game, "Program finished");
 }
 
 int main(int ac, char **av)
@@ -514,14 +577,14 @@ int main(int ac, char **av)
 	char *filename;
 	char **str;
 
-
+	game = NULL;
 	i = 0;
 	filename = av[1];
 	filename_checker(av[1]);
-	game = init_game();
+	game = init_game(); //OK
 	if(!game)
 		safe_exit(NULL, "Allocation error");
-	game->map = init_map();
+	game->map = init_map(); //OK
 	if(!game->map)
 		safe_exit(game, "Allocation error");
 	map_loader(filename, game);
@@ -531,7 +594,7 @@ int main(int ac, char **av)
 	map_wall_controller(game, str);
 	check_valid_path(game);
 
-	game->graphics = init_graphics();
+	game->graphics = init_graphics(); //OK
 	if(!game->graphics)
 		safe_exit(game, "Allocation error");
 	create_window(game);
@@ -540,32 +603,9 @@ int main(int ac, char **av)
 	render_player(game);
 
 	mlx_hook(game->graphics->mlx_win, KeyPress, KeyPressMask, key_input_handler, game); //bak
-
-
+	mlx_hook(game->graphics->mlx_win, 17, 1 << 17L, close_window, game);
+	mlx_loop(game->graphics->mlx);
 	}
 	else
 		safe_exit(NULL, "Too few argument");
-	// int i = 0;
-	// char *filename = av[1];
-	
-	// filename_checker(av[1]);
- 
-	// map_loader(filename, game->map); //map okuma, char **'a atama, satır sütun sayısı bulma
-	// check_is_rect(game->map);
-	// map_controller(game->map);
-	// map_controller2(game->map);
-	// check_valid_path(game->map);
-
-	// create_window(game);
-	// create_images(game->graphics);
-	// render_map(game);
-	// render_player(game);
-	// mlx_hook(game->graphics->mlx_win, KeyPress, KeyPressMask, key_input_handler, game);
-	// mlx_hook(game->graphics->mlx_win, 17, 1 << 17L, close_window, game);
-	// mlx_loop(game->graphics->mlx);
-
-	// while(game->map->map_test[i])
-	// {
-	// 	printf("[%s]\n", game->map->map_test[i++]);
-	// }
 }
