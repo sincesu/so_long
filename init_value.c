@@ -6,11 +6,12 @@
 /*   By: saincesu <saincesu@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/02/12 14:42:22 by saincesu          #+#    #+#             */
-/*   Updated: 2025/02/12 14:45:59 by saincesu         ###   ########.fr       */
+/*   Updated: 2025/02/17 02:58:04 by saincesu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "so_long.h"
+#include "libft/libft.h"
 #include <stdlib.h>
 
 t_game	*init_game(void)
